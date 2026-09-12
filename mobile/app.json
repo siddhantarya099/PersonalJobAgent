@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Personal Job Agent",
+    "slug": "personal-job-agent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "personaljobagent"
+  }
+}

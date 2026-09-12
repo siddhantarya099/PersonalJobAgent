@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PersonalJobAgent.Api/PersonalJobAgent.Api.csproj" />
+    <Project Path="src/PersonalJobAgent.Application/PersonalJobAgent.Application.csproj" />
+    <Project Path="src/PersonalJobAgent.Domain/PersonalJobAgent.Domain.csproj" />
+    <Project Path="src/PersonalJobAgent.Infrastructure/PersonalJobAgent.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PersonalJobAgent.IntegrationTests/PersonalJobAgent.IntegrationTests.csproj" />
+    <Project Path="tests/PersonalJobAgent.UnitTests/PersonalJobAgent.UnitTests.csproj" />
+  </Folder>
+</Solution>
