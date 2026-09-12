@@ -7,6 +7,7 @@ using PersonalJobAgent.Infrastructure.Persistence;
 using PersonalJobAgent.Infrastructure.Persistence.Repositories;
 using PersonalJobAgent.Infrastructure.Notifications;
 using PersonalJobAgent.Infrastructure.Resumes;
+using PersonalJobAgent.Application.Services;
 
 namespace PersonalJobAgent.Infrastructure;
 
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<ICandidateRepository, CandidateRepository>();
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IJobMatchRepository, JobMatchRepository>();
+        services.AddScoped<IJobAnalysisPipeline, JobAnalysisPipeline>();
         services.AddScoped<IApplicationRepository, ApplicationRepository>();
         services.AddScoped<IResumeRepository, ResumeRepository>();
         services.AddSingleton<IPdfResumeTextExtractor, PdfResumeTextExtractor>();

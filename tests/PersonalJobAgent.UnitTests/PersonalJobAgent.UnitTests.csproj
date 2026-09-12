@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PersonalJobAgent.Application\PersonalJobAgent.Application.csproj" />
     <ProjectReference Include="..\..\src\PersonalJobAgent.Domain\PersonalJobAgent.Domain.csproj" />
+    <ProjectReference Include="..\..\src\PersonalJobAgent.Api\PersonalJobAgent.Api.csproj" />
     <ProjectReference Include="..\..\src\PersonalJobAgent.Infrastructure\PersonalJobAgent.Infrastructure.csproj" />
   </ItemGroup>
 

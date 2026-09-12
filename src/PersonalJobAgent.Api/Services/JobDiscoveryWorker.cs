@@ -44,8 +44,31 @@ public sealed class JobDiscoveryWorker : BackgroundService
                 var source = new JsonJobFeedSource(
                     _httpClientFactory.CreateClient(),
                     options.FeedUrl);
-                var importedIds = await discoveryService.ImportAsync(source, stoppingToken);
-                _logger.LogInformation("Scheduled job discovery imported {Count} new jobs.", importedIds.Count);
+                var importedIds = await discoveryService.ImportAsync(
+                    source,
+                    stoppingToken);
+
+                _logger.LogInformation(
+                "Scheduled job discovery imported {Count} new jobs.",
+                importedIds.Count);
+                
+                if (importedIds.Count > 0)
+                {
+                    var analysisPipeline =
+                    scope.ServiceProvider.GetRequiredService<IJobAnalysisPipeline>();
+
+                    var analysisResult = await analysisPipeline.ProcessAsync(
+                        importedIds,
+                        stoppingToken);
+
+                    _logger.LogInformation(
+                        "Job analysis pipeline completed. Processed: {ProcessedCount}, " +
+                        "Analyzed: {AnalyzedCount}, Skipped: {SkippedCount}, Failed: {FailedCount}.",
+                        analysisResult.ProcessedCount,
+                        analysisResult.AnalyzedCount,
+                        analysisResult.SkippedCount,
+                        analysisResult.FailedCount);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

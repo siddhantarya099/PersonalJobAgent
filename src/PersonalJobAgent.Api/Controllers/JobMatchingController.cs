@@ -18,6 +18,7 @@ public sealed class JobMatchingController : ControllerBase
     private readonly IJdParserService _jdParserService;
     private readonly IJobAnalysisService _jobAnalysisService;
     private readonly IJobDiscoveryService _jobDiscoveryService;
+    private readonly IJobAnalysisPipeline _jobAnalysisPipeline;
     private readonly IJobRepository _jobRepository;
     private readonly IJobMatchRepository _jobMatchRepository;
     private readonly ICandidateRepository _candidateRepository;
@@ -28,6 +29,7 @@ public sealed class JobMatchingController : ControllerBase
         IJdParserService jdParserService,
         IJobAnalysisService jobAnalysisService,
         IJobDiscoveryService jobDiscoveryService,
+        IJobAnalysisPipeline jobAnalysisPipeline,
         IJobRepository jobRepository,
         IJobMatchRepository jobMatchRepository,
         ICandidateRepository candidateRepository,
@@ -37,6 +39,7 @@ public sealed class JobMatchingController : ControllerBase
         _jdParserService = jdParserService;
         _jobAnalysisService = jobAnalysisService;
         _jobDiscoveryService = jobDiscoveryService;
+        _jobAnalysisPipeline = jobAnalysisPipeline;
         _jobRepository = jobRepository;
         _jobMatchRepository = jobMatchRepository;
         _candidateRepository = candidateRepository;
@@ -197,13 +200,30 @@ public sealed class JobMatchingController : ControllerBase
         }
 
         var importedJobIds = await _jobDiscoveryService.ImportAsync(
-            new RequestJobSource(request.Jobs),
-            cancellationToken);
+        new RequestJobSource(request.Jobs),
+        cancellationToken);
+
+        var analysisResult = importedJobIds.Count > 0
+            ? await _jobAnalysisPipeline.ProcessAsync(
+                importedJobIds,
+                cancellationToken)
+            : new JobAnalysisPipelineResult(
+                ProcessedCount: 0,
+                AnalyzedCount: 0,
+                SkippedCount: 0,
+                FailedCount: 0);
 
         return Ok(new
         {
             importedCount = importedJobIds.Count,
-            jobIds = importedJobIds
+            jobIds = importedJobIds,
+            analysis = new
+            {
+                processedCount = analysisResult.ProcessedCount,
+                analyzedCount = analysisResult.AnalyzedCount,
+                skippedCount = analysisResult.SkippedCount,
+                failedCount = analysisResult.FailedCount
+            }
         });
     }
 
