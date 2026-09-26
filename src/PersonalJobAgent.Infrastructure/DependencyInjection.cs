@@ -8,6 +8,7 @@ using PersonalJobAgent.Infrastructure.Persistence.Repositories;
 using PersonalJobAgent.Infrastructure.Notifications;
 using PersonalJobAgent.Infrastructure.Resumes;
 using PersonalJobAgent.Application.Services;
+using PersonalJobAgent.Infrastructure.JobDiscovery;
 
 namespace PersonalJobAgent.Infrastructure;
 
@@ -31,6 +32,12 @@ public static class DependencyInjection
         {
             client.BaseAddress = new Uri("https://api.openai.com/");
             client.Timeout = TimeSpan.FromSeconds(60);
+        });
+
+        services.Configure<AdzunaOptions>(configuration.GetSection(AdzunaOptions.SectionName));
+        services.AddHttpClient<AdzunaJobSource>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
         });
 
         services.AddDbContext<PersonalJobAgentDbContext>(options =>

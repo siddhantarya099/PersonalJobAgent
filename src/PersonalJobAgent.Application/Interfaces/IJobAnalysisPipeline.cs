@@ -11,4 +11,5 @@ public sealed record JobAnalysisPipelineResult(
     int ProcessedCount,
     int AnalyzedCount,
     int SkippedCount,
+    int DeferredCount,
     int FailedCount);

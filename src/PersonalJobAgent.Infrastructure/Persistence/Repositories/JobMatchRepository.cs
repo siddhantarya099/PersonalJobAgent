@@ -25,6 +25,13 @@ internal sealed class JobMatchRepository : IJobMatchRepository
             .FirstOrDefaultAsync(jm => jm.JobId == jobId && jm.CandidateId == candidateId, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<JobMatch>> GetByJobIdsAndCandidateAsync(IEnumerable<Guid> jobIds, Guid candidateId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.JobMatches
+            .Where(jm => jobIds.Contains(jm.JobId) && jm.CandidateId == candidateId)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(JobMatch jobMatch, CancellationToken cancellationToken = default)
     {
         await _dbContext.JobMatches.AddAsync(jobMatch, cancellationToken);

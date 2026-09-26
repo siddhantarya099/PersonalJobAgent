@@ -6,6 +6,7 @@ public interface IJobMatchRepository
 {
     Task<JobMatch?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<JobMatch?> GetByJobAndCandidateAsync(Guid jobId, Guid candidateId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<JobMatch>> GetByJobIdsAndCandidateAsync(IEnumerable<Guid> jobIds, Guid candidateId, CancellationToken cancellationToken = default);
     Task AddAsync(JobMatch jobMatch, CancellationToken cancellationToken = default);
     Task UpdateAsync(JobMatch jobMatch, CancellationToken cancellationToken = default);
 }

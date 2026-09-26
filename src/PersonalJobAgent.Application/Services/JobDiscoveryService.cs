@@ -24,6 +24,9 @@ public sealed class JobDiscoveryService : IJobDiscoveryService
         var discoveredJobs = await source.FetchJobsAsync(cancellationToken);
         var importedJobIds = new List<Guid>();
 
+        var processedExternalIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var processedContentHashes = new HashSet<string>();
+
         foreach (var discoveredJob in discoveredJobs)
         {
             if (string.IsNullOrWhiteSpace(discoveredJob.ExternalId) ||
@@ -33,11 +36,21 @@ public sealed class JobDiscoveryService : IJobDiscoveryService
             }
 
             var contentHash = ComputeContentHash(discoveredJob.Description);
+
+            if (processedExternalIds.Contains(discoveredJob.ExternalId) ||
+                processedContentHashes.Contains(contentHash))
+            {
+                continue;
+            }
+
             if (await _jobRepository.GetByExternalIdAsync(discoveredJob.ExternalId, cancellationToken) != null ||
                 await _jobRepository.GetByContentHashAsync(contentHash, cancellationToken) != null)
             {
                 continue;
             }
+
+            processedExternalIds.Add(discoveredJob.ExternalId);
+            processedContentHashes.Add(contentHash);
 
             var job = new Job(
                 discoveredJob.ExternalId,

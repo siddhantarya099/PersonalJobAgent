@@ -158,6 +158,162 @@ public sealed class JobAnalysisPipelineTests
     }
 
     [Fact]
+    public async Task ProcessAsync_WhenAdzunaDescriptionIsTruncated_DefersJob()
+    {
+        // Arrange
+        var candidate = CreateCandidate();
+
+        var truncatedDescription = new string('A', 500);
+
+        var job = new Job(
+            externalId: Guid.NewGuid().ToString(),
+            source: "Adzuna",
+            company: "Test Company",
+            title: "Data Engineer",
+            description: truncatedDescription,
+            location: "Gurugram",
+            salaryMinLpa: 14m,
+            salaryMaxLpa: 20m,
+            jobUrl: "https://example.com/job",
+            postedAtUtc: DateTime.UtcNow,
+            contentHash: Guid.NewGuid().ToString());
+
+        var jobRepository = new FakeJobRepository(job);
+        var candidateRepository = new FakeCandidateRepository(candidate);
+        var jobMatchRepository = new FakeJobMatchRepository();
+        var parserService = new FakeJdParserService();
+        var analysisService = new FakeJobAnalysisService();
+
+        var pipeline = CreatePipeline(
+            jobRepository,
+            candidateRepository,
+            jobMatchRepository,
+            parserService,
+            analysisService);
+
+        // Act
+        var result = await pipeline.ProcessAsync([job.Id]);
+
+        // Assert
+        Assert.Equal(1, result.ProcessedCount);
+        Assert.Equal(0, result.AnalyzedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Equal(1, result.DeferredCount);
+        Assert.Equal(0, result.FailedCount);
+
+        Assert.Equal(0, parserService.ParseCallCount);
+        Assert.Equal(0, analysisService.AnalyzeCallCount);
+    }
+
+    private sealed class FakeEnricher : IJobDescriptionEnricher
+    {
+        private readonly string? _result;
+        public FakeEnricher(string? result) => _result = result;
+        public bool CanEnrich(Job job) => true;
+        public Task<string?> EnrichAsync(Job job, CancellationToken cancellationToken = default) => Task.FromResult(_result);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenAdzunaDescriptionIsTruncated_AndEnrichmentSucceeds_AnalyzesJob()
+    {
+        // Arrange
+        var candidate = CreateCandidate();
+        var truncatedDescription = new string('A', 500);
+
+        var job = new Job(
+            externalId: Guid.NewGuid().ToString(),
+            source: "Adzuna",
+            company: "Test Company",
+            title: "Data Engineer",
+            description: truncatedDescription,
+            location: "Gurugram",
+            salaryMinLpa: 14m,
+            salaryMaxLpa: 20m,
+            jobUrl: "https://example.com/job",
+            postedAtUtc: DateTime.UtcNow,
+            contentHash: Guid.NewGuid().ToString());
+
+        var jobRepository = new FakeJobRepository(job);
+        var candidateRepository = new FakeCandidateRepository(candidate);
+        var jobMatchRepository = new FakeJobMatchRepository();
+        var parserService = new FakeJdParserService();
+        var analysisService = new FakeJobAnalysisService();
+        
+        var enrichers = new[] { new FakeEnricher("Full enriched description") };
+
+        var pipeline = CreatePipeline(
+            jobRepository,
+            candidateRepository,
+            jobMatchRepository,
+            parserService,
+            analysisService,
+            enrichers);
+
+        // Act
+        var result = await pipeline.ProcessAsync([job.Id]);
+
+        // Assert
+        Assert.Equal(1, result.ProcessedCount);
+        Assert.Equal(1, result.AnalyzedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Equal(0, result.DeferredCount);
+        Assert.Equal(0, result.FailedCount);
+
+        Assert.Equal(1, parserService.ParseCallCount);
+        Assert.Equal(1, analysisService.AnalyzeCallCount);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WhenAdzunaDescriptionIsTruncated_AndEnrichmentFails_DefersJob()
+    {
+        // Arrange
+        var candidate = CreateCandidate();
+        var truncatedDescription = new string('A', 500);
+
+        var job = new Job(
+            externalId: Guid.NewGuid().ToString(),
+            source: "Adzuna",
+            company: "Test Company",
+            title: "Data Engineer",
+            description: truncatedDescription,
+            location: "Gurugram",
+            salaryMinLpa: 14m,
+            salaryMaxLpa: 20m,
+            jobUrl: "https://example.com/job",
+            postedAtUtc: DateTime.UtcNow,
+            contentHash: Guid.NewGuid().ToString());
+
+        var jobRepository = new FakeJobRepository(job);
+        var candidateRepository = new FakeCandidateRepository(candidate);
+        var jobMatchRepository = new FakeJobMatchRepository();
+        var parserService = new FakeJdParserService();
+        var analysisService = new FakeJobAnalysisService();
+        
+        var enrichers = new[] { new FakeEnricher(null) }; // Fails to enrich
+
+        var pipeline = CreatePipeline(
+            jobRepository,
+            candidateRepository,
+            jobMatchRepository,
+            parserService,
+            analysisService,
+            enrichers);
+
+        // Act
+        var result = await pipeline.ProcessAsync([job.Id]);
+
+        // Assert
+        Assert.Equal(1, result.ProcessedCount);
+        Assert.Equal(0, result.AnalyzedCount);
+        Assert.Equal(0, result.SkippedCount);
+        Assert.Equal(1, result.DeferredCount);
+        Assert.Equal(0, result.FailedCount);
+
+        Assert.Equal(0, parserService.ParseCallCount);
+        Assert.Equal(0, analysisService.AnalyzeCallCount);
+    }
+
+    [Fact]
     public async Task ProcessAsync_WhenParserFails_CountsAsFailedAndContinues()
     {
         // Arrange
@@ -221,15 +377,24 @@ public sealed class JobAnalysisPipelineTests
         ICandidateRepository candidateRepository,
         IJobMatchRepository jobMatchRepository,
         IJdParserService parserService,
-        IJobAnalysisService analysisService)
+        IJobAnalysisService analysisService,
+        IEnumerable<IJobDescriptionEnricher>? enrichers = null)
     {
+        var uow = new FakeUnitOfWork();
+        var enrichmentService = new JobDescriptionEnrichmentService(jobRepository, uow, enrichers ?? Enumerable.Empty<IJobDescriptionEnricher>());
         return new JobAnalysisPipeline(
             jobRepository,
             candidateRepository,
             jobMatchRepository,
             parserService,
             analysisService,
+            enrichmentService,
             NullLogger<JobAnalysisPipeline>.Instance);
+    }
+
+    private sealed class FakeUnitOfWork : IUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
     }
 
     private static Candidate CreateCandidate()
@@ -396,6 +561,17 @@ public sealed class JobAnalysisPipelineTests
                 _matches.FirstOrDefault(match =>
                     match.JobId == jobId &&
                     match.CandidateId == candidateId));
+        }
+
+        public Task<IReadOnlyCollection<JobMatch>> GetByJobIdsAndCandidateAsync(
+            IEnumerable<Guid> jobIds,
+            Guid candidateId,
+            CancellationToken cancellationToken = default)
+        {
+            var result = _matches.Where(match =>
+                jobIds.Contains(match.JobId) &&
+                match.CandidateId == candidateId).ToList();
+            return Task.FromResult<IReadOnlyCollection<JobMatch>>(result);
         }
 
         public Task AddAsync(

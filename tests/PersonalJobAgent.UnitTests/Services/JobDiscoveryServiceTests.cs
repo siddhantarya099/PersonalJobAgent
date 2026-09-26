@@ -41,6 +41,30 @@ public sealed class JobDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task ImportAsync_SkipsDuplicatesInSameBatch()
+    {
+        var repository = new FakeJobRepository();
+        var unitOfWork = new RecordingUnitOfWork();
+        var service = new JobDiscoveryService(repository, unitOfWork);
+
+        var importedIds = await service.ImportAsync(new FakeJobSource(
+        [
+            CreateJob("duplicate-id", "description 1"),
+            CreateJob("duplicate-id", "description 2"), // Same ID, different content
+            CreateJob("different-id-1", "same content"),
+            CreateJob("different-id-2", "same content") // Different ID, same content
+        ]));
+
+        Assert.Equal(2, importedIds.Count);
+        Assert.Equal(2, repository.Jobs.Count);
+        Assert.Equal(1, unitOfWork.SaveCalls);
+
+        var savedJobs = repository.Jobs.ToList();
+        Assert.Contains(savedJobs, j => j.ExternalId == "duplicate-id" && j.Description == "description 1");
+        Assert.Contains(savedJobs, j => j.ExternalId == "different-id-1" && j.Description == "same content");
+    }
+
+    [Fact]
     public async Task ImportAsync_SkipsRecordsWithoutExternalIdOrDescription()
     {
         var repository = new FakeJobRepository();

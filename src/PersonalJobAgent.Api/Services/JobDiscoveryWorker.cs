@@ -6,18 +6,15 @@ namespace PersonalJobAgent.Api.Services;
 
 public sealed class JobDiscoveryWorker : BackgroundService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptions<JobDiscoveryOptions> _options;
     private readonly ILogger<JobDiscoveryWorker> _logger;
 
     public JobDiscoveryWorker(
-        IHttpClientFactory httpClientFactory,
         IServiceScopeFactory scopeFactory,
         IOptions<JobDiscoveryOptions> options,
         ILogger<JobDiscoveryWorker> logger)
     {
-        _httpClientFactory = httpClientFactory;
         _scopeFactory = scopeFactory;
         _options = options;
         _logger = logger;
@@ -41,9 +38,7 @@ public sealed class JobDiscoveryWorker : BackgroundService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var discoveryService = scope.ServiceProvider.GetRequiredService<IJobDiscoveryService>();
-                var source = new JsonJobFeedSource(
-                    _httpClientFactory.CreateClient(),
-                    options.FeedUrl);
+                var source = scope.ServiceProvider.GetRequiredService<AdzunaJobSource>();
                 var importedIds = await discoveryService.ImportAsync(
                     source,
                     stoppingToken);
@@ -63,10 +58,11 @@ public sealed class JobDiscoveryWorker : BackgroundService
 
                     _logger.LogInformation(
                         "Job analysis pipeline completed. Processed: {ProcessedCount}, " +
-                        "Analyzed: {AnalyzedCount}, Skipped: {SkippedCount}, Failed: {FailedCount}.",
+                        "Analyzed: {AnalyzedCount}, Skipped: {SkippedCount}, Deferred: {DeferredCount}, Failed: {FailedCount}.",
                         analysisResult.ProcessedCount,
                         analysisResult.AnalyzedCount,
                         analysisResult.SkippedCount,
+                        analysisResult.DeferredCount,
                         analysisResult.FailedCount);
                 }
             }

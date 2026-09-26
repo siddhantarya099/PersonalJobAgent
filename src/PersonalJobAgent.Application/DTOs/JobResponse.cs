@@ -12,6 +12,8 @@ public sealed class JobResponse
 
     public string Title { get; set; } = string.Empty;
 
+    public string Description { get; set; } = string.Empty;
+
     public string Location { get; set; } = string.Empty;
 
     public decimal? SalaryMinLpa { get; set; }
@@ -23,4 +25,8 @@ public sealed class JobResponse
     public DateTime? PostedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+
+    public string AnalysisStatus { get; set; } = string.Empty;
+
+    public JobMatchResponse? Match { get; set; }
 }

@@ -55,4 +55,12 @@ public sealed class Job : BaseEntity
         PostedAtUtc = postedAtUtc;
         ContentHash = contentHash;
     }
+
+    public void UpdateDescription(
+    string description,
+    string contentHash)
+    {
+        Description = description;
+        ContentHash = contentHash;
+    }
 }

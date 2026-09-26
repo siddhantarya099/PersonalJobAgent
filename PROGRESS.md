@@ -117,6 +117,19 @@
 - Added opt-in `JobDiscoveryWorker` with configurable interval; disabled by default in application settings.
 - **Remaining:** configure a selected approved feed and add an integration-test harness.
 
+#### Step 9.5: Job Description Enrichment
+- Added `IJobDescriptionEnricher` abstraction and `JobDescriptionEnrichmentService` coordinator.
+- Implemented provider-based enrichment architecture supporting multiple `IJobDescriptionEnricher` implementations.
+- Integrated enrichment flow into `JobAnalysisPipeline` so that truncated Adzuna jobs (e.g. exactly 500 chars) are gracefully deferred and attempt enrichment prior to full analysis.
+- Added comprehensive unit tests for enrichment coordinator and pipeline integration.
+- **Remaining (Providers):** Implement a concrete `IJobDescriptionEnricher` for ATS platforms (e.g., Greenhouse, Lever, Ashby) once a reliable full-description extraction strategy is possible. (Adzuna HTML scraping was intentionally bypassed for reliability).
+
+#### Step 9.6: Job Discovery Deduplication & API Hardening
+- **Deduplication:** Hardened `JobDiscoveryService` with `HashSet`-based tracking to prevent duplicates (same `ExternalId` or `ContentHash`) *within the same import batch* from being redundantly processed and inserted.
+- **API Improvements:** Updated `JobResponse` DTO to include `Description`, `AnalysisStatus` (`Analyzed`, `Failed`, `Deferred`, `Pending`), and `Match` (when available).
+- **Job Detail API:** Enhanced `GET /api/job-matching/jobs/{jobId}` and `GET /api/job-matching/jobs` endpoints to return the rich `JobResponse` mapping seamlessly using existing repository components.
+- **Search & Pagination:** Verified `GetPageAsync` properly applies search and source filters across paginated results natively in EF Core.
+
 ---
 
 ### Phase 4 — Autonomous Agents

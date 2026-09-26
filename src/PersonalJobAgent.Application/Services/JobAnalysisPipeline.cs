@@ -10,6 +10,7 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
     private readonly IJobMatchRepository _jobMatchRepository;
     private readonly IJdParserService _jdParserService;
     private readonly IJobAnalysisService _jobAnalysisService;
+    private readonly JobDescriptionEnrichmentService _enrichmentService;
     private readonly ILogger<JobAnalysisPipeline> _logger;
 
     public JobAnalysisPipeline(
@@ -18,6 +19,7 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
         IJobMatchRepository jobMatchRepository,
         IJdParserService jdParserService,
         IJobAnalysisService jobAnalysisService,
+        JobDescriptionEnrichmentService enrichmentService,
         ILogger<JobAnalysisPipeline> logger)
     {
         _jobRepository = jobRepository;
@@ -25,6 +27,7 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
         _jobMatchRepository = jobMatchRepository;
         _jdParserService = jdParserService;
         _jobAnalysisService = jobAnalysisService;
+        _enrichmentService = enrichmentService;
         _logger = logger;
     }
 
@@ -36,6 +39,7 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
         var analyzedCount = 0;
         var skippedCount = 0;
         var failedCount = 0;
+        var deferredCount = 0;
 
         var candidate = await _candidateRepository.GetActiveCandidateAsync(cancellationToken);
 
@@ -85,6 +89,30 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
                     continue;
                 }
 
+                if (job.Source.Equals("Adzuna", StringComparison.OrdinalIgnoreCase) && 
+                job.Description.Length >= 500)
+                {
+                    bool enriched = await _enrichmentService.EnrichAsync(job.Id, cancellationToken);
+                    
+                    if (!enriched)
+                    {
+                        deferredCount++;
+
+                        _logger.LogInformation("Deferring analysis for job {JobId} because the Adzuna description appears to be truncated and could not be enriched.",
+                        job.Id);
+
+                        continue;
+                    }
+                    
+                    // Reload job to get the updated description
+                    job = await _jobRepository.GetByIdAsync(jobId, cancellationToken);
+                    if (job == null)
+                    {
+                        failedCount++;
+                        continue;
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(job.Description))
                 {
                     failedCount++;
@@ -132,6 +160,7 @@ public sealed class JobAnalysisPipeline : IJobAnalysisPipeline
             processedCount,
             analyzedCount,
             skippedCount,
+            deferredCount,
             failedCount);
     }
 }

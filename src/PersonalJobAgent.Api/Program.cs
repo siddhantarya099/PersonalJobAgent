@@ -38,6 +38,8 @@ builder.Services.AddScoped<
     IJobAnalysisService,
     JobAnalysisService>();
 
+builder.Services.AddScoped<JobDescriptionEnrichmentService>();
+
 builder.Services.AddScoped<
     IJdParserService,
     JdParserService>();

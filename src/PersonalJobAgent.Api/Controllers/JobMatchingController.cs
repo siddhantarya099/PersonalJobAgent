@@ -109,12 +109,14 @@ public sealed class JobMatchingController : ControllerBase
             Source = job.Source,
             Company = job.Company,
             Title = job.Title,
+            Description = job.Description,
             Location = job.Location,
             SalaryMinLpa = job.SalaryMinLpa,
             SalaryMaxLpa = job.SalaryMaxLpa,
             JobUrl = job.JobUrl,
             PostedAtUtc = job.PostedAtUtc,
-            CreatedAtUtc = job.CreatedAtUtc
+            CreatedAtUtc = job.CreatedAtUtc,
+            AnalysisStatus = "Pending"
         };
 
         return CreatedAtAction(nameof(GetJob), new { jobId = job.Id }, response);
@@ -211,6 +213,7 @@ public sealed class JobMatchingController : ControllerBase
                 ProcessedCount: 0,
                 AnalyzedCount: 0,
                 SkippedCount: 0,
+                DeferredCount: 0,
                 FailedCount: 0);
 
         return Ok(new
@@ -222,6 +225,7 @@ public sealed class JobMatchingController : ControllerBase
                 processedCount = analysisResult.ProcessedCount,
                 analyzedCount = analysisResult.AnalyzedCount,
                 skippedCount = analysisResult.SkippedCount,
+                deferredCount = analysisResult.DeferredCount,
                 failedCount = analysisResult.FailedCount
             }
         });
@@ -241,6 +245,27 @@ public sealed class JobMatchingController : ControllerBase
             return NotFound();
         }
 
+        var candidate = await _candidateRepository.GetActiveCandidateAsync(cancellationToken);
+        JobMatch? match = null;
+        if (candidate != null)
+        {
+            match = await _jobMatchRepository.GetByJobAndCandidateAsync(jobId, candidate.Id, cancellationToken);
+        }
+
+        var status = "Pending";
+        if (match != null)
+        {
+            status = "Analyzed";
+        }
+        else if (string.IsNullOrWhiteSpace(job.Description))
+        {
+            status = "Failed";
+        }
+        else if (job.Source.Equals("Adzuna", StringComparison.OrdinalIgnoreCase) && job.Description.Length >= 500)
+        {
+            status = "Deferred";
+        }
+
         var response = new JobResponse
         {
             Id = job.Id,
@@ -248,12 +273,22 @@ public sealed class JobMatchingController : ControllerBase
             Source = job.Source,
             Company = job.Company,
             Title = job.Title,
+            Description = job.Description,
             Location = job.Location,
             SalaryMinLpa = job.SalaryMinLpa,
             SalaryMaxLpa = job.SalaryMaxLpa,
             JobUrl = job.JobUrl,
             PostedAtUtc = job.PostedAtUtc,
-            CreatedAtUtc = job.CreatedAtUtc
+            CreatedAtUtc = job.CreatedAtUtc,
+            AnalysisStatus = status,
+            Match = match != null ? new JobMatchResponse
+            {
+                JobMatchId = match.Id,
+                JobId = match.JobId,
+                CandidateId = match.CandidateId,
+                MatchResult = ToMatchResult(match),
+                CreatedAtUtc = match.CreatedAtUtc
+            } : null
         };
 
         return Ok(response);
@@ -282,22 +317,64 @@ public sealed class JobMatchingController : ControllerBase
             pageSize,
             cancellationToken);
 
-        return Ok(new JobListResponse
+        var candidate = await _candidateRepository.GetActiveCandidateAsync(cancellationToken);
+        
+        IReadOnlyCollection<JobMatch> matches = Array.Empty<JobMatch>();
+        if (candidate != null && result.Jobs.Count > 0)
         {
-            Jobs = result.Jobs.Select(job => new JobResponse
+            matches = await _jobMatchRepository.GetByJobIdsAndCandidateAsync(
+                result.Jobs.Select(j => j.Id),
+                candidate.Id,
+                cancellationToken);
+        }
+
+        var responseJobs = result.Jobs.Select(job => 
+        {
+            var match = matches.FirstOrDefault(m => m.JobId == job.Id);
+            
+            var status = "Pending";
+            if (match != null)
+            {
+                status = "Analyzed";
+            }
+            else if (string.IsNullOrWhiteSpace(job.Description))
+            {
+                status = "Failed";
+            }
+            else if (job.Source.Equals("Adzuna", StringComparison.OrdinalIgnoreCase) && job.Description.Length >= 500)
+            {
+                status = "Deferred";
+            }
+
+            return new JobResponse
             {
                 Id = job.Id,
                 ExternalId = job.ExternalId,
                 Source = job.Source,
                 Company = job.Company,
                 Title = job.Title,
+                Description = job.Description,
                 Location = job.Location,
                 SalaryMinLpa = job.SalaryMinLpa,
                 SalaryMaxLpa = job.SalaryMaxLpa,
                 JobUrl = job.JobUrl,
                 PostedAtUtc = job.PostedAtUtc,
-                CreatedAtUtc = job.CreatedAtUtc
-            }).ToList(),
+                CreatedAtUtc = job.CreatedAtUtc,
+                AnalysisStatus = status,
+                Match = match != null ? new JobMatchResponse
+                {
+                    JobMatchId = match.Id,
+                    JobId = match.JobId,
+                    CandidateId = match.CandidateId,
+                    MatchResult = ToMatchResult(match),
+                    CreatedAtUtc = match.CreatedAtUtc
+                } : null
+            };
+        }).ToList();
+
+        return Ok(new JobListResponse
+        {
+            Jobs = responseJobs,
             Page = page,
             PageSize = pageSize,
             TotalCount = result.TotalCount

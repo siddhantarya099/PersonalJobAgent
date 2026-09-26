@@ -23,6 +23,7 @@ public sealed class JobMatchingControllerTests
                 ProcessedCount: 1,
                 AnalyzedCount: 1,
                 SkippedCount: 0,
+                DeferredCount: 0,
                 FailedCount: 0));
 
         var controller = CreateController(
@@ -70,7 +71,7 @@ public sealed class JobMatchingControllerTests
         // Arrange
         var discoveryService = new FakeJobDiscoveryService();
         var analysisPipeline = new FakeJobAnalysisPipeline(
-            new JobAnalysisPipelineResult(0, 0, 0, 0));
+            new JobAnalysisPipelineResult(0, 0, 0, 0, 0));
 
         var controller = CreateController(
             discoveryService: discoveryService,
@@ -101,7 +102,7 @@ public sealed class JobMatchingControllerTests
         // Arrange
         var discoveryService = new FakeJobDiscoveryService();
         var analysisPipeline = new FakeJobAnalysisPipeline(
-            new JobAnalysisPipelineResult(0, 0, 0, 0));
+            new JobAnalysisPipelineResult(0, 0, 0, 0, 0));
 
         var controller = CreateController(
             discoveryService: discoveryService,
@@ -294,6 +295,12 @@ public sealed class JobMatchingControllerTests
             Guid candidateId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<JobMatch?>(null);
+
+        public Task<IReadOnlyCollection<JobMatch>> GetByJobIdsAndCandidateAsync(
+            IEnumerable<Guid> jobIds,
+            Guid candidateId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyCollection<JobMatch>>(Array.Empty<JobMatch>());
 
         public Task AddAsync(
             JobMatch jobMatch,
